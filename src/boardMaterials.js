@@ -20,7 +20,7 @@ export function surface(kind) {
     const asset = kind === 'cork' ? 'Cork001' : 'Wood049'
     const loader = new THREE.TextureLoader()
     const load = (name, color = false) => {
-      const map = loader.load(`/textures/${kind}/${asset}_1K-JPG_${name}.jpg`)
+      const map = loader.load(`${import.meta.env.BASE_URL}textures/${kind}/${asset}_1K-JPG_${name}.jpg`)
       map.wrapS = map.wrapT = THREE.RepeatWrapping; map.repeat.set(kind === 'cork' ? 2.5 : 1, kind === 'cork' ? 1.8 : .18); map.anisotropy = 8
       if (color) map.colorSpace = THREE.SRGBColorSpace
       return map
