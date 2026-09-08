@@ -46,19 +46,20 @@ export default function CorkBoard(props) {
     const pixelBudget = isMobile ? 3_000_000 : 9_000_000
     const renderScale = Math.max(1, Math.min(2, Math.max(devicePixelRatio, 1.5), Math.sqrt(pixelBudget / (width * height))))
     renderer.setPixelRatio(renderScale)
-    renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap; renderer.shadowMap.autoUpdate = false
+    renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap
     renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.04
     renderer.domElement.setAttribute('aria-hidden', 'true')
     mount.prepend(renderer.domElement)
 
     const scene = new THREE.Scene(), group = new THREE.Group(); scene.add(group)
-    scene.background = new THREE.Color('#66503a')
-    const camera = new THREE.PerspectiveCamera(36, width / height, .1, 80)
+    scene.background = new THREE.Color('#b8b09a')
+    const camera = new THREE.PerspectiveCamera(60, width / height, .1, 80)
     const pmrem = new THREE.PMREMGenerator(renderer), room = new RoomEnvironment()
     const environment = pmrem.fromScene(room, .04)
     scene.environment = environment.texture; scene.environmentIntensity = .19
     room.dispose(); pmrem.dispose()
     const boardHeight = 12, boardWidth = boardHeight * width / height
+    const deskY = -6.22, deskZ = 2.2
     const {cork, wood, fibers} = sharedRef.current
     for (const k of ['map', 'normalMap', 'roughnessMap']) cork[k].repeat.set(boardWidth / 4.5, boardHeight / 4.5)
     cork.color.set('#aca28b'); cork.normalScale.set(.8, .8)
@@ -242,10 +243,8 @@ export default function CorkBoard(props) {
     const controlsY = -4.45
     const noteH = small ? .84 : .94
     const noteW = small ? Math.min(1.35, usable / 3.15) : 2.2
-    const addX = small ? usable / 2 - noteW / 2 : boardWidth / 2 - 3.2
-    const searchX = addX - noteW - (small ? .10 : .35)
+    const searchX = small ? usable / 2 - noteW / 2 : boardWidth / 2 - 3.2
     const demoX = small ? searchX - noteW - .10 : -boardWidth / 2 + 3.2
-    interactive(paper(noteW, noteH, noteTexture('+ Documento', 'Colocar una hoja', 'yellow'), addX, controlsY, -.07, 'pin', 1), 'Cargar documento', () => actions.current.onAdd(), 'add-hit')
     interactive(paper(noteW, noteH, noteTexture('Buscar', 'Consultar el fichero', 'cream'), searchX, controlsY+.03, .045, 'pin', 0), 'Buscar documentos', () => actions.current.onSearch(), 'search-hit')
     interactive(paper(noteW, noteH, noteTexture(demo ? 'Muestra' : 'Mis documentos', demo ? 'Ver mis documentos ↗' : 'Ver muestra visual ↗', 'green'), demoX, controlsY+.035, -.035, 'pin', 3), demo ? 'Ver mis documentos' : 'Ver muestra visual', () => actions.current.onToggleDemo(), 'mode-hit')
     if (actions.current.onPrevious || actions.current.onNext) {
@@ -254,7 +253,7 @@ export default function CorkBoard(props) {
       if (actions.current.onNext) interactive(paper(.72,.45,noteTexture('→','','cream'), usable/2-.4,y,.03,'tape'), 'Países siguientes', () => actions.current.onNext?.())
     }
     if (!small && boardWidth > 14) {
-      const pencil = new THREE.Group(); group.add(pencil); pencil.position.set(0,-4.93,.15); pencil.rotation.z = -.11
+      const pencil = new THREE.Group(); group.add(pencil); pencil.position.set(boardWidth*.06, deskY+.155, deskZ-1.05); pencil.rotation.z = -.11
       const barrel = mesh(new THREE.CylinderGeometry(.045,.045,2.2,6),green,0,0,0,pencil); barrel.rotation.z = Math.PI/2
       const tip = mesh(new THREE.ConeGeometry(.045,.23,6),wood,1.2,0,0,pencil); tip.rotation.z = -Math.PI/2
       const graphite = mesh(new THREE.ConeGeometry(.012,.055,8),trim,1.335,0,0,pencil); graphite.rotation.z = -Math.PI/2
@@ -272,18 +271,190 @@ export default function CorkBoard(props) {
     }
     holes.instanceMatrix.needsUpdate = true
 
+    // ── Office environment ────────────────────────────────────────────────
+    // Painted wall behind the board — cream/beige, slightly yellowed like the 90s
+    const wallMat = new THREE.MeshStandardMaterial({color:'#cfc3a0', roughness:.97})
+    const wallMesh = new THREE.Mesh(new THREE.PlaneGeometry(boardWidth+26, boardHeight+16), wallMat)
+    wallMesh.position.z = -.50; wallMesh.receiveShadow = true; group.add(wallMesh)
+
+    // Floor — linoleum/parquet, extends forward toward camera
+    const floorMat2 = new THREE.MeshStandardMaterial({color:'#7a5c3a', roughness:.78, metalness:.03})
+    const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(boardWidth+26, 22), floorMat2)
+    floorMesh.rotation.x = -Math.PI/2; floorMesh.position.set(0,-7.1,4)
+    floorMesh.receiveShadow = true; group.add(floorMesh)
+
+    // Zócalo / baseboard
+    mesh(new THREE.BoxGeometry(boardWidth+26,.30,.20), new THREE.MeshStandardMaterial({color:'#5a3c22',roughness:.78}), 0,-6.97,-.42)
+
+    // Ceiling strip
+    mesh(new THREE.BoxGeometry(boardWidth+26,.16,1.4), new THREE.MeshStandardMaterial({color:'#d8cfb8',roughness:.95}), 0,7.12,.12)
+
+    // ── Desk ─────────────────────────────────────────────────────────────
+    const deskW = boardWidth+6, deskD = 5
+    mesh(new THREE.BoxGeometry(deskW,.22,deskD), wood, 0, deskY, deskZ)
+    mesh(new THREE.BoxGeometry(deskW,.54,.09), wood, 0, deskY-.37, deskZ+deskD*.5-.06) // front apron
+
+    // ── Fan — 90s desk fan, large ─────────────────────────────────────────
+    // Positioned at the right edge of the desk to stay clear of document cards
+    const fanX = boardWidth*.48, fanBaseZ = deskZ-.90
+    const fanBaseY = deskY+.17
+
+    // Base disc + collar + pole + neck joint (scaled ~1.4×)
+    mesh(new THREE.CylinderGeometry(.88,1.06,.20,24), steel, fanX, fanBaseY, fanBaseZ)
+    mesh(new THREE.CylinderGeometry(.19,.16,.18,14), steel, fanX, fanBaseY+.19, fanBaseZ)
+    mesh(new THREE.CylinderGeometry(.105,.105,2.60,10), steel, fanX, fanBaseY+1.49, fanBaseZ)
+    mesh(new THREE.CylinderGeometry(.19,.14,.22,14), steel, fanX, fanBaseY+2.90, fanBaseZ)
+
+    const fanHead = new THREE.Group()
+    fanHead.position.set(fanX, fanBaseY+3.14, fanBaseZ); group.add(fanHead)
+
+    // Housing cylinder facing forward (Z axis)
+    const housing = new THREE.Mesh(new THREE.CylinderGeometry(1.0,1.0,.36,30), steel)
+    housing.rotation.x = Math.PI/2; housing.castShadow = true; fanHead.add(housing)
+    // Front rim ring
+    const rimRing = new THREE.Mesh(new THREE.TorusGeometry(1.0,.044,8,36), steel)
+    rimRing.position.z = .18; fanHead.add(rimRing)
+
+    // Blade shape — realistic propeller profile
+    const bladeShape = new THREE.Shape()
+    bladeShape.moveTo(0, 0.10)
+    bladeShape.bezierCurveTo( 0.28, 0.13,  0.38, 0.44,  0.34, 0.82)
+    bladeShape.bezierCurveTo( 0.27, 0.96,  0.08, 0.96,  0, 0.90)
+    bladeShape.bezierCurveTo(-0.16, 0.93, -0.28, 0.79, -0.19, 0.45)
+    bladeShape.bezierCurveTo(-0.09, 0.18, -0.04, 0.10,  0, 0.10)
+
+    const fanBlades = new THREE.Group()
+    // Push blades in front of housing so they're not hidden inside it
+    fanBlades.position.z = .18
+    fanHead.add(fanBlades)
+    const bladeMat2 = new THREE.MeshStandardMaterial({color:'#cbb890', roughness:.38, metalness:.07, side:THREE.DoubleSide})
+    const bladeGeo = new THREE.ShapeGeometry(bladeShape, 18)
+    for(let i=0;i<4;i++){
+      const blade = new THREE.Mesh(bladeGeo, bladeMat2)
+      blade.rotation.order = 'ZYX'
+      blade.rotation.z = i * Math.PI / 2
+      blade.rotation.y = .40   // airfoil pitch
+      blade.castShadow = true; fanBlades.add(blade)
+    }
+    // Hub cap (cylinder, Z-facing)
+    const hubMesh = new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,.14,16), new THREE.MeshStandardMaterial({color:'#d2c8b0',roughness:.36,metalness:.10}))
+    hubMesh.rotation.x = Math.PI/2; hubMesh.position.z = .09; hubMesh.castShadow = true; fanHead.add(hubMesh)
+
+    // Wire guard — 3 concentric rings + 8 radial spokes on front face
+    for(const r of [.90,.62,.30]){
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(r,.016,7,32), steel)
+      ring.position.z = .38; fanHead.add(ring)
+    }
+    for(let i=0;i<8;i++){
+      const a = i*Math.PI/4
+      const spoke = new THREE.Mesh(new THREE.CylinderGeometry(.009,.009,.92,4), steel)
+      spoke.rotation.x = Math.PI/2; spoke.rotation.z = a
+      spoke.position.set(Math.cos(a)*.42, Math.sin(a)*.42, .38); fanHead.add(spoke)
+    }
+    // Back guard
+    const backRing = new THREE.Mesh(new THREE.TorusGeometry(.90,.016,7,32), steel)
+    backRing.position.z = -.38; fanHead.add(backRing)
+
+    // ── Telephone (90s desk phone) ─────────────────────────────────────────
+    const phoneX = -boardWidth*.32, phoneZ = deskZ-1.20
+    const phoneMat = new THREE.MeshStandardMaterial({color:'#1c1c1c', roughness:.65})
+    mesh(new THREE.BoxGeometry(.80,.10,.54), phoneMat, phoneX, deskY+.16, phoneZ)
+    mesh(new THREE.BoxGeometry(.52,.07,.35), new THREE.MeshStandardMaterial({color:'#242424',roughness:.55}), phoneX, deskY+.215, phoneZ+.04)
+    const btnMat = new THREE.MeshStandardMaterial({color:'#e5ddc8', roughness:.55, metalness:.06})
+    for(let r=0;r<4;r++) for(let c=0;c<3;c++)
+      mesh(new THREE.CylinderGeometry(.024,.024,.013,8), btnMat, phoneX-.07+c*.075, deskY+.228, phoneZ+.14-r*.079)
+    for(let i=0;i<5;i++)
+      mesh(new THREE.CylinderGeometry(.006,.006,.012,6), new THREE.MeshStandardMaterial({color:'#050505'}), phoneX+.405, deskY+.178+i*.016, phoneZ-.04)
+    const hsCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(phoneX-.30,deskY+.29,phoneZ-.17),
+      new THREE.Vector3(phoneX-.12,deskY+.38,phoneZ-.20),
+      new THREE.Vector3(phoneX+.04,deskY+.40,phoneZ-.18),
+      new THREE.Vector3(phoneX+.22,deskY+.32,phoneZ-.13),
+      new THREE.Vector3(phoneX+.32,deskY+.25,phoneZ-.09),
+    ])
+    const hsTube = new THREE.Mesh(new THREE.TubeGeometry(hsCurve,20,.040,8,false), phoneMat)
+    hsTube.castShadow = true; group.add(hsTube)
+    const capMat = new THREE.MeshStandardMaterial({color:'#080808',roughness:.82})
+    const hs0=hsCurve.getPoint(0), hs1=hsCurve.getPoint(1)
+    mesh(new THREE.SphereGeometry(.052,8,6), capMat, hs0.x,hs0.y,hs0.z)
+    mesh(new THREE.SphereGeometry(.052,8,6), capMat, hs1.x,hs1.y,hs1.z)
+    const coilPts=[]
+    for(let i=0;i<=40;i++){const t=i/40;coilPts.push(new THREE.Vector3(phoneX-.22+t*.12+Math.cos(t*Math.PI*9)*.022,deskY+.19+Math.sin(t*Math.PI*9)*.018,phoneZ-.10+t*.05))}
+    group.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(coilPts),80,.008,5,false),phoneMat))
+
+    // ── Notepad with spiral binding ───────────────────────────────────────
+    const padX=-boardWidth*.14, padZ=deskZ-1.32
+    mesh(new THREE.BoxGeometry(.64,.030,.82), new THREE.MeshStandardMaterial({color:'#f2ebe0',roughness:.93}), padX, deskY+.126, padZ)
+    mesh(new THREE.BoxGeometry(.64,.006,.82), new THREE.MeshStandardMaterial({color:'#b33a2e',roughness:.78}), padX, deskY+.108, padZ)
+    mesh(new THREE.BoxGeometry(.64,.003,.82), new THREE.MeshStandardMaterial({color:'#c94030',roughness:.72}), padX, deskY+.143, padZ)
+    const ringMat=new THREE.MeshStandardMaterial({color:'#aaaaaa',roughness:.35,metalness:.65})
+    for(let i=0;i<11;i++){
+      const ring=new THREE.Mesh(new THREE.TorusGeometry(.020,.007,6,12),ringMat)
+      ring.rotation.x=Math.PI/2; ring.position.set(padX-.28+i*.057, deskY+.138, padZ-.42); group.add(ring)
+    }
+    for(let i=0;i<5;i++) mesh(new THREE.BoxGeometry(.52,.001,.002), new THREE.MeshStandardMaterial({color:'#5580a8',roughness:.98}), padX, deskY+.148, padZ-.14+i*.10)
+
+    // ── Pencil cup with colored pencils ──────────────────────────────────
+    const cupX=boardWidth*.14, cupZ=deskZ-1.08
+    mesh(new THREE.CylinderGeometry(.090,.082,.30,14), new THREE.MeshStandardMaterial({color:'#c8a870',roughness:.65}), cupX, deskY+.26, cupZ)
+    mesh(new THREE.CylinderGeometry(.078,.078,.008,14), new THREE.MeshStandardMaterial({color:'#0c0805',roughness:.98}), cupX, deskY+.413, cupZ)
+    const pColors=['#e84040','#2860c8','#28a840','#d49010','#9428c0']
+    const pAngZ=[.0,.30,-.26,.16,-.14], pAngX=[.10,.07,-.09,.06,-.07]
+    for(let i=0;i<5;i++){
+      const pg=new THREE.Group()
+      pg.position.set(cupX+Math.sin(pAngZ[i])*.038, deskY+.29, cupZ+Math.sin(pAngX[i])*.02)
+      pg.rotation.z=pAngZ[i]*.55; pg.rotation.x=pAngX[i]; group.add(pg)
+      mesh(new THREE.CylinderGeometry(.018,.018,.92,6),new THREE.MeshStandardMaterial({color:pColors[i],roughness:.55}),0,.39,0,pg)
+      mesh(new THREE.ConeGeometry(.018,.12,6),new THREE.MeshStandardMaterial({color:'#c8a878',roughness:.62}),0,.91,0,pg)
+      mesh(new THREE.ConeGeometry(.006,.028,6),new THREE.MeshStandardMaterial({color:'#1a1a1a'}),0,.975,0,pg)
+      mesh(new THREE.CylinderGeometry(.019,.019,.04,10),new THREE.MeshStandardMaterial({color:'#c8b060',roughness:.3,metalness:.7}),0,-.085,0,pg)
+      mesh(new THREE.CylinderGeometry(.017,.017,.05,10),new THREE.MeshStandardMaterial({color:'#d07878',roughness:.6}),0,-.130,0,pg)
+    }
+
+    // ── Post-it "+ Documento" (interactive, standing near pencil cup) ─────
+    const addW=1.4, addH=1.0, addBaseZ=deskZ-.98
+    const addP=new THREE.Group()
+    addP.position.set(cupX+.26, deskY+.62, addBaseZ); addP.userData.hover=false; group.add(addP)
+    const addTex=noteTexture('+ Documento','Agregar al tablero','yellow')
+    addTex.anisotropy=renderer.capabilities.getMaxAnisotropy()
+    const addSheet=new THREE.Mesh(new THREE.PlaneGeometry(addW,addH,4,4),new THREE.MeshStandardMaterial({map:addTex,bumpMap:fibers,bumpScale:.003,roughness:1,side:THREE.DoubleSide}))
+    addSheet.castShadow=addSheet.receiveShadow=true; addP.add(addSheet)
+    interactive({p:addP,sheet:addSheet,w:addW,h:addH,baseZ:addBaseZ},'Cargar documento',()=>actions.current.onAdd(),'add-hit')
+
+    // ── Plant (cactus in terracotta pot) ──────────────────────────────────
+    const plantX=boardWidth*.26, plantZ=deskZ-.82
+    const terraMat2=new THREE.MeshStandardMaterial({color:'#a85230',roughness:.88})
+    const cactusMat=new THREE.MeshStandardMaterial({color:'#3a6828',roughness:.72})
+    mesh(new THREE.CylinderGeometry(.14,.18,.22,14),terraMat2,plantX,deskY+.22,plantZ)
+    mesh(new THREE.TorusGeometry(.150,.014,6,18),terraMat2,plantX,deskY+.33,plantZ)
+    mesh(new THREE.CylinderGeometry(.132,.132,.004,14),new THREE.MeshStandardMaterial({color:'#1e0f05',roughness:.97}),plantX,deskY+.334,plantZ)
+    mesh(new THREE.CylinderGeometry(.060,.072,.58,10),cactusMat,plantX,deskY+.62,plantZ)
+    mesh(new THREE.SphereGeometry(.062,10,6,0,Math.PI*2,0,Math.PI/2),cactusMat,plantX,deskY+.91,plantZ)
+    const larm=mesh(new THREE.CylinderGeometry(.038,.038,.24,8),cactusMat,plantX-.12,deskY+.52,plantZ)
+    larm.rotation.z=Math.PI/2.8
+    mesh(new THREE.CylinderGeometry(.038,.038,.16,8),cactusMat,plantX-.24,deskY+.67,plantZ)
+    const rarm=mesh(new THREE.CylinderGeometry(.036,.036,.20,8),cactusMat,plantX+.11,deskY+.55,plantZ)
+    rarm.rotation.z=-Math.PI/3.2
+    mesh(new THREE.CylinderGeometry(.036,.036,.14,8),cactusMat,plantX+.20,deskY+.68,plantZ)
+    const spineMat2=new THREE.MeshStandardMaterial({color:'#e8d5a8',roughness:.5})
+    for(let i=0;i<8;i++){const a=i*Math.PI/4,r=.072;mesh(new THREE.CylinderGeometry(.002,.002,.042,4),spineMat2,plantX+Math.cos(a)*r,deskY+.62+i*.035,plantZ+Math.sin(a)*r)}
+
+    // Warm desk lamp light — downward SpotLight
+    const lampLight = new THREE.SpotLight('#ffeaa0', 22, 9, .62, .55, 2)
+    lampLight.position.set(fanX-2.2, deskY+3.2, deskZ)
+    lampLight.target.position.set(fanX-2.2, deskY, deskZ-1)
+    scene.add(lampLight, lampLight.target)
+
     const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
-    const distance = boardHeight / (2 * Math.tan(THREE.MathUtils.degToRad(18)))
-    camera.position.set(0,0,distance)
+    const distance = boardHeight / (2 * Math.tan(THREE.MathUtils.degToRad(22)))
+    camera.position.set(0, 0, distance)
     const pointer = new THREE.Vector2(), target = new THREE.Vector3()
     const move = e => {pointer.set(e.clientX / width - .5, e.clientY / height - .5)}
     const leave = () => pointer.set(0,0)
     mount.addEventListener('pointermove',move); mount.addEventListener('pointerleave',leave)
     const center = new THREE.Vector3(), corner = new THREE.Vector3()
-    const lookTarget = new THREE.Vector3(), focusPoint = new THREE.Vector3(), hoverWP = new THREE.Vector3()
-    // Static scene: compute shadows once after full setup, then disable auto-update.
-    renderer.shadowMap.needsUpdate = true
-    let animFov = 36, last = 0
+    const lookTarget = new THREE.Vector3(0,-1.5,0), focusPoint = new THREE.Vector3(), hoverWP = new THREE.Vector3()
+    let animFov = 60, last = 0
     function render(time = 0) {
       if(document.hidden || time-last < 30) return
       const dt = Math.min((time-last)/1000,.05); last = time
@@ -299,28 +470,33 @@ export default function CorkBoard(props) {
       // XY follows the pointer quickly; Z (zoom) uses the slower easeZ.
       const tx = (reduced?0:pointer.x*.10)+(hoverPos?hoverPos.x*.05:0)
       const ty = (reduced?0:-pointer.y*.07)+(hoverPos?hoverPos.y*.025:0)
-      const tz = distance-(hoverPos?2.5:0)
+      const tz = distance
       camera.position.x = THREE.MathUtils.lerp(camera.position.x, tx, ease)
       camera.position.y = THREE.MathUtils.lerp(camera.position.y, ty, ease)
       camera.position.z = THREE.MathUtils.lerp(camera.position.z, tz, easeZ)
       // Look-at: subtle drift toward hovered
-      focusPoint.set(hoverPos?hoverPos.x*.08:0,hoverPos?hoverPos.y*.05:0,0)
+      focusPoint.set(hoverPos?hoverPos.x*.08:0,-1.5+(hoverPos?hoverPos.y*.05:0),0)
       lookTarget.lerp(focusPoint,ease*.40)
       camera.lookAt(lookTarget)
       // FOV: very slight narrowing on hover, slow transition
-      const nextFov = hoverPos?34.8:36
-      if(Math.abs(camera.fov-nextFov)>.01){camera.fov=THREE.MathUtils.lerp(camera.fov,nextFov,ease*.25);camera.updateProjectionMatrix()}
+      const nextFov = hoverPos?58.5:60
+      if(Math.abs(camera.fov-nextFov)>.01){camera.fov=THREE.MathUtils.lerp(camera.fov,nextFov,ease*.06);camera.updateProjectionMatrix()}
       camera.updateMatrixWorld()
       objects.forEach(({p,sheet,button,w,h,baseZ}) => {
         if(!p.visible) return
         const hov=p.userData.hover
-        p.position.z = THREE.MathUtils.lerp(p.position.z,hov?baseZ+.26:baseZ,ease)
-        p.rotation.x = THREE.MathUtils.lerp(p.rotation.x,hov&&!reduced?-.05:0,ease*.8)
+        p.position.z = THREE.MathUtils.lerp(p.position.z,hov?baseZ+.26:baseZ,ease*.06)
+        p.rotation.x = THREE.MathUtils.lerp(p.rotation.x,hov&&!reduced?-.05:0,ease*.06)
         p.updateWorldMatrix(true,true)
         sheet.getWorldPosition(center); center.project(camera)
         corner.set(w/2,h/2,0); sheet.localToWorld(corner); corner.project(camera)
         Object.assign(button.style,{left: ((center.x+1)*width/2)+'px', top: ((1-center.y)*height/2)+'px', width: Math.abs(corner.x-center.x)*width+'px', height: Math.abs(corner.y-center.y)*height+'px', transform:'translate(-50%,-50%) rotate('+(-p.rotation.z)+'rad)'})
       })
+      // Fan animation — blades spin, head oscillates slowly
+      if (!reduced) {
+        fanBlades.rotation.z += 11 * dt
+        fanHead.rotation.y = Math.sin(time * 0.00045) * 0.38
+      }
       renderer.render(scene,camera)
     }
     renderer.setAnimationLoop(render)
