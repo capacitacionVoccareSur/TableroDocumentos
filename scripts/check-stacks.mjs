@@ -1,0 +1,28 @@
+import { chromium } from '@playwright/test'
+const browser = await chromium.launch({channel:'msedge', headless:true})
+try {
+  const page = await browser.newPage({viewport:{width:1366,height:768},reducedMotion:'reduce'})
+  const errors=[]; page.on('pageerror',e=>errors.push(e.message))
+  await page.addInitScript(() => {
+    localStorage.setItem('voccare-documents-v2',JSON.stringify(Array.from({length:5},(_,i)=>({id:'test-'+i,country:'argentina',account:'Prueba de pila',title:'Hoja '+(i+1),status:'signature',url:'https://docs.google.com/document/d/test',local:true}))))
+  })
+  await page.goto(process.env.BOARD_URL || 'http://127.0.0.1:5175/')
+  await page.getByRole('button',{name:'Argentina: Prueba de pila, Hoja 1',exact:true}).waitFor()
+  if(await page.locator('.document-hit:visible').count()!==2) throw Error('Wrong visible stack size')
+  await page.getByRole('button',{name:'Más documentos de Argentina'}).click()
+  await page.getByRole('button',{name:'Argentina: Prueba de pila, Hoja 3',exact:true}).waitFor()
+  await page.getByRole('button',{name:'Más documentos de Argentina'}).click()
+  await page.getByRole('button',{name:'Argentina: Prueba de pila, Hoja 5',exact:true}).click()
+  await page.getByRole('dialog',{name:'Hoja 5',exact:true}).waitFor()
+  await page.keyboard.press('Escape')
+  await page.getByRole('button',{name:'Más documentos de Argentina'}).click()
+  await page.getByRole('button',{name:'Argentina: Prueba de pila, Hoja 1',exact:true}).waitFor()
+  await page.setViewportSize({width:844,height:390})
+  await page.waitForTimeout(1500)
+  await page.getByRole('button',{name:'Cargar documento',exact:true}).click()
+  await page.getByRole('dialog').waitFor()
+  await page.keyboard.press('Escape')
+  if(await page.evaluate(()=>document.documentElement.scrollHeight>innerHeight || document.documentElement.scrollWidth>innerWidth)) throw Error('Landscape viewport overflow')
+  if(errors.length) throw Error(errors.join('\n'))
+  console.log('PASS: stack pagination, last document, wraparound, reduced motion, landscape controls, no scroll.')
+} finally {await browser.close()}

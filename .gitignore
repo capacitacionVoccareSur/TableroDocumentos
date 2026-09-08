@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+
+# Environment variables (contienen URLs y claves privadas)
+.env.local
+.env.*.local
+
+# Editor y herramientas
+.vscode/
+.idea/
+.claude/
+.agents/
+skills-lock.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Artifacts de pruebas
+artifacts/
