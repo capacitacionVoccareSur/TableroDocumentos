@@ -84,6 +84,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .hud-stat-n--sig  { color: #7a4a08 }
 .hud-stat-n--rev  { color: #2a3a7a }
 
+.hud-loading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: rgba(80,50,10,0.45);
+}
+.hud-spinner {
+  animation: spin .9s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg) } }
+
 .hud-sep {
   width: 1px;
   height: 12px;
@@ -180,11 +193,20 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .board-col-empty {
-  font: italic 11px 'Segoe UI', sans-serif;
-  color: rgba(50,30,5,0.30);
+  font: 500 11px 'Segoe UI', sans-serif;
+  color: rgba(80,50,10,0.35);
   text-align: center;
-  padding: 16px 0;
+  padding: 14px 0;
+  border: 1px dashed rgba(140,100,40,0.22);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .14s, color .14s;
+  background: none;
+  width: 100%;
 }
+.board-col-empty:hover { background: rgba(200,160,60,0.07); color: rgba(80,50,10,0.65) }
+.board-col-empty--loading { cursor: default; border: none; letter-spacing: 4px }
+.board-col-empty--loading:hover { background: none }
 
 /* ── Board card ───────────────────────────────────────────────────────────── */
 .board-card {
@@ -266,13 +288,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   flex: 1;
 }
 
-.board-demo-tag {
-  font: 600 8px 'Courier New', monospace;
-  color: rgba(100,65,15,0.35);
-  background: rgba(140,100,20,0.08);
-  padding: 1px 4px;
-  border-radius: 3px;
-}
 
 .board-card-chevron {
   font-size: 9px;
@@ -355,27 +370,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 .bcd-action:hover { background: rgba(180,130,40,0.18) }
 
-/* ── Demo banner ──────────────────────────────────────────────────────────── */
-.board-demo-banner {
-  position: absolute;
-  bottom: 14px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 5px 14px;
-  background: rgba(255,245,215,0.75);
-  border: 1px solid rgba(160,110,30,0.25);
-  border-radius: 999px;
-  font: 10px 'Courier New', monospace;
-  color: rgba(80,50,10,0.55);
-  backdrop-filter: blur(8px);
-  white-space: nowrap;
-  pointer-events: auto;
-}
-.board-demo-banner button { color: rgba(80,50,10,0.45); font: inherit; transition: color .14s }
-.board-demo-banner button:hover { color: rgba(80,50,10,0.85) }
 
 /* ── Modal ────────────────────────────────────────────────────────────────── */
 .modal-backdrop {

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, X, Trash2, Search, ArrowUpRight } from 'lucide-react'
+import { Plus, X, Trash2, Search, ArrowUpRight, Loader2 } from 'lucide-react'
 import { countries, statusMeta } from './data'
 
 // ─── SVG Flags ────────────────────────────────────────────────────────────────
 function Flag({ id, size = 20 }) {
   const w = size * 1.5, h = size
-  const shared = { width: w, height: h, viewBox: `0 0 30 20`, style: { borderRadius: 2, flexShrink: 0, display: 'block' } }
+  const shared = { width: w, height: h, viewBox: '0 0 30 20', style: { borderRadius: 2, flexShrink: 0, display: 'block' } }
   switch (id) {
     case 'argentina': return (
       <svg {...shared}><rect width="30" height="20" fill="#74acdf"/><rect y="6.67" width="30" height="6.67" fill="#fff"/><circle cx="15" cy="10" r="3" fill="#f6b40e"/></svg>
@@ -14,7 +14,7 @@ function Flag({ id, size = 20 }) {
       <svg {...shared}><rect width="30" height="6.67" fill="#d52b1e"/><rect y="6.67" width="30" height="6.67" fill="#f4e400"/><rect y="13.33" width="30" height="6.67" fill="#007a3d"/></svg>
     )
     case 'chile': return (
-      <svg {...shared}><rect width="30" height="20" fill="#d52b1e"/><rect y="0" width="30" height="10" fill="#fff"/><rect width="10" height="10" fill="#0033a0"/><polygon points="5,2.5 6.18,6.09 9.76,6.09 6.9,8.26 8.09,11.85 5,9.68 1.91,11.85 3.1,8.26 0.24,6.09 3.82,6.09" fill="#fff"/></svg>
+      <svg {...shared}><rect width="30" height="20" fill="#d52b1e"/><rect width="30" height="10" fill="#fff"/><rect width="10" height="10" fill="#0033a0"/><polygon points="5,2.5 6.18,6.09 9.76,6.09 6.9,8.26 8.09,11.85 5,9.68 1.91,11.85 3.1,8.26 0.24,6.09 3.82,6.09" fill="#fff"/></svg>
     )
     case 'ecuador': return (
       <svg {...shared}><rect width="30" height="10" fill="#ffd100"/><rect y="10" width="30" height="5" fill="#003087"/><rect y="15" width="30" height="5" fill="#ce1126"/></svg>
@@ -35,13 +35,7 @@ function Flag({ id, size = 20 }) {
 const storageKey = 'voccare-documents-v2'
 const SHEETS_URL = import.meta.env.VITE_SHEETS_URL || ''
 
-const samples = countries.flatMap((country, i) => [
-  { id: `s-${country.id}-1`, country: country.id, account: 'Cuenta Aurora',   title: 'Protocolo de atención al cliente',    status: 'done',      demo: true },
-  { id: `s-${country.id}-2`, country: country.id, account: i % 2 ? 'Cuenta Horizonte' : 'Cuenta Sur', title: i % 2 ? 'Acuerdo de capacitación técnica' : 'Manual de bienvenida', status: i % 2 ? 'review' : 'signature', demo: true },
-  { id: `s-${country.id}-3`, country: country.id, account: 'Cuenta Norte',    title: 'Protocolo de seguridad ocupacional',  status: 'new',       demo: true },
-])
-
-function readDocuments() {
+function readLocal() {
   try {
     const data = JSON.parse(localStorage.getItem(storageKey) || '[]')
     return Array.isArray(data) ? data.filter(d => d && typeof d.id === 'string' && typeof d.title === 'string' && typeof d.account === 'string') : []
@@ -94,14 +88,28 @@ function DocumentForm({ country, onClose, onSave }) {
         <button className="icon-button" onClick={onClose} aria-label="Cerrar"><X size={18} /></button>
       </header>
       <form onSubmit={submit}>
-        <label>País<select name="country" value={form.country} onChange={field}>{countries.map(c => <option key={c.id} value={c.id}>{c.flag} {c.name}</option>)}</select></label>
-        <label>Cuenta<input name="account" value={form.account} onChange={field} placeholder="Nombre de la cuenta" maxLength={90} required /></label>
-        <label className="full">Título<input name="title" value={form.title} onChange={field} placeholder="Nombre del documento" maxLength={180} required /></label>
-        <label className="full">Enlace de Google Docs<input name="url" type="url" value={form.url} onChange={field} placeholder="https://docs.google.com/document/d/…" required /></label>
-        <label className="full">Estado<select name="status" value={form.status} onChange={field}>{Object.entries(statusMeta).map(([key, val]) => <option key={key} value={key}>{val.label}</option>)}</select></label>
+        <label>País
+          <select name="country" value={form.country} onChange={field}>
+            {countries.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </label>
+        <label>Cuenta
+          <input name="account" value={form.account} onChange={field} placeholder="Nombre de la cuenta" maxLength={90} required />
+        </label>
+        <label className="full">Título
+          <input name="title" value={form.title} onChange={field} placeholder="Nombre del documento" maxLength={180} required />
+        </label>
+        <label className="full">Enlace de Google Docs
+          <input name="url" type="url" value={form.url} onChange={field} placeholder="https://docs.google.com/document/d/…" required />
+        </label>
+        <label className="full">Estado
+          <select name="status" value={form.status} onChange={field}>
+            {Object.entries(statusMeta).map(([key, val]) => <option key={key} value={key}>{val.label}</option>)}
+          </select>
+        </label>
         {error && <p role="alert" className="error full">{error}</p>}
         <footer className="full">
-          <small>Se guarda en este navegador.</small>
+          <small>{SHEETS_URL ? 'Se guarda en Google Sheets.' : 'Se guarda en este navegador.'}</small>
           <button className="btn-primary" type="submit"><Plus size={15} /> Cargar documento</button>
         </footer>
       </form>
@@ -113,18 +121,9 @@ function DocumentForm({ country, onClose, onSave }) {
 function BoardCard({ doc, onOpen }) {
   const [expanded, setExpanded] = useState(false)
   const meta = statusMeta[doc.status] || statusMeta.signature
-
-  function toggle(e) {
-    e.stopPropagation()
-    setExpanded(s => !s)
-  }
-
-  function openDoc(e) {
-    e.stopPropagation()
-    onOpen(doc)
-  }
-
   const hasValidUrl = /^https:\/\/docs\.google\.com\//.test(doc.url || '')
+
+  function toggle(e) { e.stopPropagation(); setExpanded(s => !s) }
 
   return (
     <article
@@ -139,7 +138,6 @@ function BoardCard({ doc, onOpen }) {
       <div className="board-card-top">
         <span className={`board-dot board-dot--${doc.status}`} />
         <span className="board-card-status">{meta.short}</span>
-        {doc.demo && <span className="board-demo-tag">demo</span>}
         <span className="board-card-chevron">{expanded ? '↑' : '↓'}</span>
       </div>
       <p className="board-card-title">{doc.title}</p>
@@ -150,13 +148,10 @@ function BoardCard({ doc, onOpen }) {
           <div className="bcd-divider" />
           <p className="bcd-label">Estado</p>
           <p className="bcd-value">{meta.label}</p>
-          {doc.demo ? (
-            <button className="bcd-action" onClick={openDoc}>Ver detalles →</button>
-          ) : hasValidUrl ? (
-            <a className="bcd-action" href={doc.url} target="_blank" rel="noreferrer">Abrir en Google Docs →</a>
-          ) : (
-            <button className="bcd-action" onClick={openDoc}>Ver detalles →</button>
-          )}
+          {hasValidUrl
+            ? <a className="bcd-action" href={doc.url} target="_blank" rel="noreferrer">Abrir en Google Docs →</a>
+            : <button className="bcd-action" onClick={e => { e.stopPropagation(); onOpen(doc) }}>Ver detalles →</button>
+          }
         </div>
       )}
     </article>
@@ -165,9 +160,9 @@ function BoardCard({ doc, onOpen }) {
 
 // ─── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [local, setLocal]   = useState(readDocuments)
+  const [local, setLocal]   = useState(readLocal)
   const [remote, setRemote] = useState([])
-  const [demo, setDemo]     = useState(() => !readDocuments().length)
+  const [loading, setLoading] = useState(!!SHEETS_URL)
   const [showForm, setShowForm] = useState(false)
   const [active, setActive]     = useState(null)
   const [detailError, setDetailError] = useState('')
@@ -184,16 +179,18 @@ export default function App() {
           .filter(d => d && typeof d.country === 'string' && typeof d.title === 'string' && typeof d.account === 'string')
           .map((d, i) => ({ ...d, id: 'remote-' + i, url: typeof d.url === 'string' ? d.url : '' }))
         setRemote(docs)
-        if (docs.length) setDemo(false)
       })
       .catch(() => {})
+      .finally(() => setLoading(false))
   }, [])
 
-  const all = useMemo(() => demo ? samples : [...remote, ...local], [demo, remote, local])
+  const all = useMemo(() => [...remote, ...local], [remote, local])
 
-  // Filter across all columns when searching
   const filtered = useMemo(() =>
-    search ? all.filter(d => (d.title + ' ' + d.account + ' ' + (countries.find(c => c.id === d.country)?.name || '')).toLocaleLowerCase('es').includes(search.toLocaleLowerCase('es'))) : null
+    search
+      ? all.filter(d => (d.title + ' ' + d.account + ' ' + (countries.find(c => c.id === d.country)?.name || ''))
+          .toLocaleLowerCase('es').includes(search.toLocaleLowerCase('es')))
+      : null
   , [all, search])
 
   const closeDoc  = useCallback(() => { setActive(null); setDetailError('') }, [])
@@ -209,7 +206,6 @@ export default function App() {
       localStorage.setItem(storageKey, JSON.stringify(next))
       setLocal(next)
     }
-    setDemo(false)
     setShowForm(false)
   }
 
@@ -235,17 +231,21 @@ export default function App() {
       {/* ── HUD ── */}
       <header className="board-hud">
         <div className="hud-stats">
-          <span className="hud-stat"><span className="hud-stat-n hud-stat-n--done">{totalDone}</span> completados</span>
-          <span className="hud-sep" />
-          <span className="hud-stat"><span className="hud-stat-n hud-stat-n--sig">{totalSignature}</span> pendientes</span>
-          <span className="hud-sep" />
-          <span className="hud-stat"><span className="hud-stat-n hud-stat-n--rev">{totalReview}</span> en revisión</span>
+          {loading
+            ? <span className="hud-loading"><Loader2 size={13} className="hud-spinner" /> Cargando…</span>
+            : <>
+                <span className="hud-stat"><span className="hud-stat-n hud-stat-n--done">{totalDone}</span> completados</span>
+                <span className="hud-sep" />
+                <span className="hud-stat"><span className="hud-stat-n hud-stat-n--sig">{totalSignature}</span> pendientes</span>
+                <span className="hud-sep" />
+                <span className="hud-stat"><span className="hud-stat-n hud-stat-n--rev">{totalReview}</span> en revisión</span>
+              </>
+          }
         </div>
         <div className="hud-actions">
           <button className="hud-btn hud-btn--ghost" onClick={() => setShowSearch(true)} aria-label="Buscar">
             <Search size={14} />
           </button>
-          {demo && <button className="hud-btn hud-btn--ghost" onClick={() => setDemo(false)}>Salir demo</button>}
           <button className="hud-btn hud-btn--primary" onClick={() => setShowForm(true)}>
             <Plus size={13} /> Cargar
           </button>
@@ -256,17 +256,22 @@ export default function App() {
       <div className="board-columns">
         {countries.map(c => {
           const colDocs = (filtered ?? all).filter(d => d.country === c.id)
-          const isFiltered = !!filtered && colDocs.length === 0 && all.filter(d => d.country === c.id).length > 0
+          const dimmed  = !!filtered && colDocs.length === 0 && all.filter(d => d.country === c.id).length > 0
           return (
-            <div key={c.id} className={`board-col${isFiltered ? ' board-col--dimmed' : ''}`}>
+            <div key={c.id} className={`board-col${dimmed ? ' board-col--dimmed' : ''}`}>
               <div className="board-col-header">
                 <Flag id={c.id} size={16} />
                 <span className="board-col-name">{c.name}</span>
               </div>
               <div className="board-col-cards">
                 {colDocs.map(doc => <BoardCard key={doc.id} doc={doc} onOpen={setActive} />)}
-                {colDocs.length === 0 && !isFiltered && (
-                  <p className="board-col-empty">Sin documentos</p>
+                {colDocs.length === 0 && !dimmed && !loading && (
+                  <button className="board-col-empty" onClick={() => setShowForm(true)}>
+                    + agregar
+                  </button>
+                )}
+                {loading && colDocs.length === 0 && (
+                  <p className="board-col-empty board-col-empty--loading">…</p>
                 )}
               </div>
             </div>
@@ -274,87 +279,80 @@ export default function App() {
         })}
       </div>
 
-      {/* Demo badge */}
-      {demo && (
-        <div className="board-demo-banner">
-          Vista de demostración
-          <button onClick={() => setDemo(false)}>× cerrar</button>
-        </div>
-      )}
-
     </div>
 
-    {/* Dialogs — outside inert zone */}
-      {showSearch && (
-        <div className="modal-backdrop" onMouseDown={e => e.target === e.currentTarget && setShowSearch(false)}>
-          <section className="document-dialog" role="dialog" aria-modal="true" aria-label="Buscar documentos">
-            <header>
-              <div><small>FICHERO</small><h2>Buscar documento</h2></div>
-              <button className="icon-button" onClick={() => setShowSearch(false)} aria-label="Cerrar"><X size={18} /></button>
-            </header>
-            <div className="search-content">
-              <label className="search-field">
-                <Search size={16} />
-                <input
-                  autoFocus
-                  type="text"
-                  placeholder="Cuenta, documento o país…"
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  aria-label="Buscar documentos"
-                />
-              </label>
-              <div className="search-results">
-                {(search ? all.filter(d => (d.title + ' ' + d.account + ' ' + (countries.find(c => c.id === d.country)?.name || '')).toLocaleLowerCase('es').includes(search.toLocaleLowerCase('es'))) : []).map(d => (
-                  <button key={d.id} className="search-result-row" onClick={() => { setShowSearch(false); setActive(d) }}>
-                    <span className={`board-dot board-dot--${d.status}`} />
-                    <span className="sr-country">{countries.find(c => c.id === d.country)?.name}</span>
-                    <span className="sr-title">{d.title}</span>
-                    <ArrowUpRight size={14} />
-                  </button>
-                ))}
-                {search && !all.filter(d => (d.title + ' ' + d.account).toLocaleLowerCase('es').includes(search.toLocaleLowerCase('es'))).length && (
-                  <p className="search-empty">Sin resultados para &ldquo;{search}&rdquo;</p>
-                )}
-                {!search && <p className="search-empty">Escribí para buscar…</p>}
-              </div>
-            </div>
-          </section>
-        </div>
-      )}
-
-      {showForm && <DocumentForm country="argentina" onClose={closeForm} onSave={save} />}
-
-      {active && (
-        <Dialog onClose={closeDoc} title={active.title}>
+    {/* ── Dialogs ── */}
+    {showSearch && (
+      <div className="modal-backdrop" onMouseDown={e => e.target === e.currentTarget && setShowSearch(false)}>
+        <section className="document-dialog" role="dialog" aria-modal="true" aria-label="Buscar documentos">
           <header>
-            <div>
-              <small>{active.demo ? 'DOCUMENTO DE MUESTRA' : countries.find(c => c.id === active.country)?.name.toUpperCase()}</small>
-              <h2>{active.title}</h2>
-            </div>
-            <button className="icon-button" onClick={closeDoc} aria-label="Cerrar"><X size={18} /></button>
+            <div><small>FICHERO</small><h2>Buscar documento</h2></div>
+            <button className="icon-button" onClick={() => setShowSearch(false)} aria-label="Cerrar"><X size={18} /></button>
           </header>
-          <div className="document-detail">
-            <p className="detail-account">{active.account}</p>
-            <span className={`detail-status detail-status--${active.status}`}>{statusMeta[active.status]?.label || 'En revisión'}</span>
-            <p className="detail-body">
-              {active.demo
-                ? 'Esta vista es de demostración. Cargá un documento real para ver su enlace en Google Docs.'
-                : 'Abrí el documento en Google Docs para revisarlo y continuar con la firma.'}
-            </p>
-            {detailError && <p role="alert" className="error">{detailError}</p>}
-            <footer className="detail-footer">
-              {active.local && <button className="delete-button" onClick={() => remove(active.id)}><Trash2 size={15} /> Eliminar</button>}
-              {active.demo
-                ? <button className="btn-primary" onClick={() => { setActive(null); setShowForm(true) }}>Cargar un documento <Plus size={16} /></button>
-                : /^https:\/\/docs\.google\.com\//.test(active.url || '')
-                  ? <a className="btn-primary" href={active.url} target="_blank" rel="noreferrer">Abrir en Google Docs <ArrowUpRight size={17} /></a>
-                  : <p className="error">El enlace guardado no es válido.</p>}
-            </footer>
+          <div className="search-content">
+            <label className="search-field">
+              <Search size={16} />
+              <input
+                autoFocus
+                type="text"
+                placeholder="Cuenta, documento o país…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                aria-label="Buscar documentos"
+              />
+            </label>
+            <div className="search-results">
+              {search
+                ? all
+                    .filter(d => (d.title + ' ' + d.account + ' ' + (countries.find(c => c.id === d.country)?.name || '')).toLocaleLowerCase('es').includes(search.toLocaleLowerCase('es')))
+                    .map(d => (
+                      <button key={d.id} className="search-result-row" onClick={() => { setShowSearch(false); setActive(d) }}>
+                        <span className={`board-dot board-dot--${d.status}`} />
+                        <span className="sr-country">{countries.find(c => c.id === d.country)?.name}</span>
+                        <span className="sr-title">{d.title}</span>
+                        <ArrowUpRight size={14} />
+                      </button>
+                    ))
+                : null
+              }
+              {search && !all.filter(d => (d.title + ' ' + d.account + ' ' + (countries.find(c => c.id === d.country)?.name || '')).toLocaleLowerCase('es').includes(search.toLocaleLowerCase('es'))).length && (
+                <p className="search-empty">Sin resultados para &ldquo;{search}&rdquo;</p>
+              )}
+              {!search && <p className="search-empty">Escribí para buscar…</p>}
+            </div>
           </div>
-        </Dialog>
-      )}
+        </section>
+      </div>
+    )}
+
+    {showForm && <DocumentForm country="argentina" onClose={closeForm} onSave={save} />}
+
+    {active && (
+      <Dialog onClose={closeDoc} title={active.title}>
+        <header>
+          <div>
+            <small>{countries.find(c => c.id === active.country)?.name.toUpperCase()}</small>
+            <h2>{active.title}</h2>
+          </div>
+          <button className="icon-button" onClick={closeDoc} aria-label="Cerrar"><X size={18} /></button>
+        </header>
+        <div className="document-detail">
+          <p className="detail-account">{active.account}</p>
+          <span className={`detail-status detail-status--${active.status}`}>{statusMeta[active.status]?.label || 'En revisión'}</span>
+          <p className="detail-body">Abrí el documento en Google Docs para revisarlo y continuar con la firma.</p>
+          {detailError && <p role="alert" className="error">{detailError}</p>}
+          <footer className="detail-footer">
+            {active.local && (
+              <button className="delete-button" onClick={() => remove(active.id)}><Trash2 size={15} /> Eliminar</button>
+            )}
+            {/^https:\/\/docs\.google\.com\//.test(active.url || '')
+              ? <a className="btn-primary" href={active.url} target="_blank" rel="noreferrer">Abrir en Google Docs <ArrowUpRight size={17} /></a>
+              : <p className="error">El enlace guardado no es válido.</p>
+            }
+          </footer>
+        </div>
+      </Dialog>
+    )}
     </>
   )
 }
-
