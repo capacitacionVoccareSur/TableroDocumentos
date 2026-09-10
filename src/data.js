@@ -1,20 +1,16 @@
 export const countries = [
-  { id: 'argentina', code: 'AR', name: 'Argentina' },
-  { id: 'bolivia', code: 'BO', name: 'Bolivia' },
-  { id: 'chile', code: 'CL', name: 'Chile' },
-  { id: 'ecuador', code: 'EC', name: 'Ecuador' },
-  { id: 'paraguay', code: 'PY', name: 'Paraguay' },
-  { id: 'peru', code: 'PE', name: 'Perú' },
-  { id: 'uruguay', code: 'UY', name: 'Uruguay' },
-]
-
-// Guía para cargar documentos manualmente: docs/CARGA-MANUAL.md
-export const updates = [
+  { id: 'argentina', code: 'AR', name: 'Argentina', flag: '🇦🇷' },
+  { id: 'bolivia',   code: 'BO', name: 'Bolivia',   flag: '🇧🇴' },
+  { id: 'chile',     code: 'CL', name: 'Chile',     flag: '🇨🇱' },
+  { id: 'ecuador',   code: 'EC', name: 'Ecuador',   flag: '🇪🇨' },
+  { id: 'paraguay',  code: 'PY', name: 'Paraguay',  flag: '🇵🇾' },
+  { id: 'peru',      code: 'PE', name: 'Perú',      flag: '🇵🇪' },
+  { id: 'uruguay',   code: 'UY', name: 'Uruguay',   flag: '🇺🇾' },
 ]
 
 export const statusMeta = {
-  signature: { label: 'Pendiente de firma', short: 'Firma', tone: 'amber' },
-  review: { label: 'Pendiente de revisión', short: 'Revisión', tone: 'blue' },
-  new: { label: 'Nueva cuenta', short: 'Nueva', tone: 'mint' },
-  done: { label: 'Completado', short: 'Listo', tone: 'quiet' },
+  done:      { label: 'Completado',         short: 'Completado',  tone: 'done' },
+  signature: { label: 'Pendiente de firma', short: 'Pendiente',   tone: 'signature' },
+  review:    { label: 'En revisión',        short: 'En revisión', tone: 'review' },
+  new:       { label: 'Nueva cuenta',       short: 'Nueva',       tone: 'new' },
 }
