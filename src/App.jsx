@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, X, Trash2, Search, ArrowUpRight, Loader2 } from 'lucide-react'
+import { Plus, X, Trash2, Search, ArrowUpRight, Pencil, Loader2 } from 'lucide-react'
 import { countries, statusMeta } from './data'
 
 // ─── SVG Flags ────────────────────────────────────────────────────────────────
@@ -68,10 +68,14 @@ function Dialog({ children, onClose, title }) {
   )
 }
 
-// ─── Document Form ─────────────────────────────────────────────────────────────
-function DocumentForm({ country, onClose, onSave }) {
-  const [form, setForm] = useState({ country, account: '', title: '', url: '', status: 'signature' })
+// ─── Document Form (crear y editar) ───────────────────────────────────────────
+function DocumentForm({ country, onClose, onSave, initial }) {
+  const isEdit = !!initial
+  const [form, setForm] = useState(
+    initial ?? { country, account: '', title: '', url: '', status: 'signature' }
+  )
   const [error, setError] = useState('')
+
   function submit(e) {
     e.preventDefault()
     try { const url = new URL(form.url); if (url.protocol !== 'https:' || url.hostname !== 'docs.google.com') throw Error() }
@@ -81,10 +85,14 @@ function DocumentForm({ country, onClose, onSave }) {
     catch { setError('No se pudo guardar. Revisá el espacio disponible.') }
   }
   const field = e => { setForm({ ...form, [e.target.name]: e.target.value }); setError('') }
+
   return (
-    <Dialog onClose={onClose} title="Cargar documento">
+    <Dialog onClose={onClose} title={isEdit ? 'Editar documento' : 'Cargar documento'}>
       <header>
-        <div><small>NUEVO DOCUMENTO</small><h2>Cargar al tablero.</h2></div>
+        <div>
+          <small>{isEdit ? 'EDITAR DOCUMENTO' : 'NUEVO DOCUMENTO'}</small>
+          <h2>{isEdit ? 'Editar documento.' : 'Cargar al tablero.'}</h2>
+        </div>
         <button className="icon-button" onClick={onClose} aria-label="Cerrar"><X size={18} /></button>
       </header>
       <form onSubmit={submit}>
@@ -110,7 +118,9 @@ function DocumentForm({ country, onClose, onSave }) {
         {error && <p role="alert" className="error full">{error}</p>}
         <footer className="full">
           <small>{SHEETS_URL ? 'Se guarda en Google Sheets.' : 'Se guarda en este navegador.'}</small>
-          <button className="btn-primary" type="submit"><Plus size={15} /> Cargar documento</button>
+          <button className="btn-primary" type="submit">
+            {isEdit ? <><Pencil size={14} /> Guardar cambios</> : <><Plus size={15} /> Cargar documento</>}
+          </button>
         </footer>
       </form>
     </Dialog>
@@ -118,7 +128,7 @@ function DocumentForm({ country, onClose, onSave }) {
 }
 
 // ─── Board Card ────────────────────────────────────────────────────────────────
-function BoardCard({ doc, onOpen }) {
+function BoardCard({ doc, onEdit, onDelete }) {
   const [expanded, setExpanded] = useState(false)
   const meta = statusMeta[doc.status] || statusMeta.signature
   const hasValidUrl = /^https:\/\/docs\.google\.com\//.test(doc.url || '')
@@ -148,10 +158,19 @@ function BoardCard({ doc, onOpen }) {
           <div className="bcd-divider" />
           <p className="bcd-label">Estado</p>
           <p className="bcd-value">{meta.label}</p>
-          {hasValidUrl
-            ? <a className="bcd-action" href={doc.url} target="_blank" rel="noreferrer">Abrir en Google Docs →</a>
-            : <button className="bcd-action" onClick={e => { e.stopPropagation(); onOpen(doc) }}>Ver detalles →</button>
-          }
+          <div className="bcd-actions">
+            {hasValidUrl && (
+              <a className="bcd-action bcd-action--primary" href={doc.url} target="_blank" rel="noreferrer">
+                <ArrowUpRight size={12} /> Abrir
+              </a>
+            )}
+            <button className="bcd-action" onClick={() => onEdit(doc)}>
+              <Pencil size={12} /> Editar
+            </button>
+            <button className="bcd-action bcd-action--danger" onClick={() => onDelete(doc)}>
+              <Trash2 size={12} /> Eliminar
+            </button>
+          </div>
         </div>
       )}
     </article>
@@ -160,13 +179,14 @@ function BoardCard({ doc, onOpen }) {
 
 // ─── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [local, setLocal]   = useState(readLocal)
-  const [remote, setRemote] = useState([])
+  const [local, setLocal]     = useState(readLocal)
+  const [remote, setRemote]   = useState([])
   const [loading, setLoading] = useState(!!SHEETS_URL)
-  const [showForm, setShowForm] = useState(false)
-  const [active, setActive]     = useState(null)
-  const [detailError, setDetailError] = useState('')
-  const [search, setSearch] = useState('')
+
+  // form state: null = cerrado, string = nuevo con ese país, objeto = editar doc
+  const [formState, setFormState] = useState(null)
+
+  const [search, setSearch]       = useState('')
   const [showSearch, setShowSearch] = useState(false)
 
   useEffect(() => {
@@ -193,36 +213,65 @@ export default function App() {
       : null
   , [all, search])
 
-  const closeDoc  = useCallback(() => { setActive(null); setDetailError('') }, [])
-  const closeForm = useCallback(() => setShowForm(false), [])
+  const closeForm = useCallback(() => setFormState(null), [])
+
+  function openNew(countryId) { setFormState(countryId) }
+  function openEdit(doc)      { setFormState(doc) }
 
   function save(form) {
     const doc = { ...form, title: form.title.trim(), account: form.account.trim() }
+    const isEdit = formState && typeof formState === 'object'
+    const editId = isEdit ? formState.id : null
+
     if (SHEETS_URL) {
-      fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify(doc) }).catch(() => {})
-      setRemote(prev => [...prev, { ...doc, id: 'remote-' + Date.now() }])
+      fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify(editId ? { ...doc, action: 'update', id: editId } : doc) }).catch(() => {})
+      if (editId) {
+        setRemote(prev => prev.map(d => d.id === editId ? { ...d, ...doc } : d))
+        setLocal(prev => {
+          const next = prev.map(d => d.id === editId ? { ...d, ...doc } : d)
+          localStorage.setItem(storageKey, JSON.stringify(next))
+          return next
+        })
+      } else {
+        setRemote(prev => [...prev, { ...doc, id: 'remote-' + Date.now() }])
+      }
     } else {
-      const next = [...local, { ...doc, id: 'local-' + (crypto.randomUUID?.() ?? Date.now()), local: true }]
-      localStorage.setItem(storageKey, JSON.stringify(next))
-      setLocal(next)
+      if (editId) {
+        const next = local.map(d => d.id === editId ? { ...d, ...doc } : d)
+        localStorage.setItem(storageKey, JSON.stringify(next))
+        setLocal(next)
+      } else {
+        const next = [...local, { ...doc, id: 'local-' + (crypto.randomUUID?.() ?? Date.now()), local: true }]
+        localStorage.setItem(storageKey, JSON.stringify(next))
+        setLocal(next)
+      }
     }
-    setShowForm(false)
+    setFormState(null)
   }
 
-  function remove(id) {
-    try {
-      const next = local.filter(d => d.id !== id)
-      localStorage.setItem(storageKey, JSON.stringify(next))
-      setLocal(next)
-      setActive(null)
-    } catch { setDetailError('No se pudo eliminar el documento.') }
+  function remove(doc) {
+    if (SHEETS_URL) {
+      fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify({ action: 'delete', id: doc.id }) }).catch(() => {})
+      setRemote(prev => prev.filter(d => d.id !== doc.id))
+    }
+    // always clean from local too (covers local: true docs)
+    const next = local.filter(d => d.id !== doc.id)
+    localStorage.setItem(storageKey, JSON.stringify(next))
+    setLocal(next)
   }
 
   const totalDone      = all.filter(d => d.status === 'done').length
   const totalSignature = all.filter(d => d.status === 'signature').length
   const totalReview    = all.filter(d => d.status === 'review' || d.status === 'new').length
 
-  const isInert = showForm || !!active || showSearch
+  const isInert = !!formState || showSearch
+
+  // resolve DocumentForm props from formState
+  const formProps = formState
+    ? typeof formState === 'string'
+      ? { country: formState, initial: undefined }
+      : { country: formState.country, initial: formState }
+    : null
 
   return (
     <>
@@ -246,7 +295,7 @@ export default function App() {
           <button className="hud-btn hud-btn--ghost" onClick={() => setShowSearch(true)} aria-label="Buscar">
             <Search size={14} />
           </button>
-          <button className="hud-btn hud-btn--primary" onClick={() => setShowForm(true)}>
+          <button className="hud-btn hud-btn--primary" onClick={() => openNew('argentina')}>
             <Plus size={13} /> Cargar
           </button>
         </div>
@@ -264,9 +313,11 @@ export default function App() {
                 <span className="board-col-name">{c.name}</span>
               </div>
               <div className="board-col-cards">
-                {colDocs.map(doc => <BoardCard key={doc.id} doc={doc} onOpen={setActive} />)}
+                {colDocs.map(doc => (
+                  <BoardCard key={doc.id} doc={doc} onEdit={openEdit} onDelete={remove} />
+                ))}
                 {colDocs.length === 0 && !dimmed && !loading && (
-                  <button className="board-col-empty" onClick={() => setShowForm(true)}>
+                  <button className="board-col-empty" onClick={() => openNew(c.id)}>
                     + agregar
                   </button>
                 )}
@@ -306,7 +357,7 @@ export default function App() {
                 ? all
                     .filter(d => (d.title + ' ' + d.account + ' ' + (countries.find(c => c.id === d.country)?.name || '')).toLocaleLowerCase('es').includes(search.toLocaleLowerCase('es')))
                     .map(d => (
-                      <button key={d.id} className="search-result-row" onClick={() => { setShowSearch(false); setActive(d) }}>
+                      <button key={d.id} className="search-result-row" onClick={() => { setShowSearch(false); openEdit(d) }}>
                         <span className={`board-dot board-dot--${d.status}`} />
                         <span className="sr-country">{countries.find(c => c.id === d.country)?.name}</span>
                         <span className="sr-title">{d.title}</span>
@@ -325,33 +376,13 @@ export default function App() {
       </div>
     )}
 
-    {showForm && <DocumentForm country="argentina" onClose={closeForm} onSave={save} />}
-
-    {active && (
-      <Dialog onClose={closeDoc} title={active.title}>
-        <header>
-          <div>
-            <small>{countries.find(c => c.id === active.country)?.name.toUpperCase()}</small>
-            <h2>{active.title}</h2>
-          </div>
-          <button className="icon-button" onClick={closeDoc} aria-label="Cerrar"><X size={18} /></button>
-        </header>
-        <div className="document-detail">
-          <p className="detail-account">{active.account}</p>
-          <span className={`detail-status detail-status--${active.status}`}>{statusMeta[active.status]?.label || 'En revisión'}</span>
-          <p className="detail-body">Abrí el documento en Google Docs para revisarlo y continuar con la firma.</p>
-          {detailError && <p role="alert" className="error">{detailError}</p>}
-          <footer className="detail-footer">
-            {active.local && (
-              <button className="delete-button" onClick={() => remove(active.id)}><Trash2 size={15} /> Eliminar</button>
-            )}
-            {/^https:\/\/docs\.google\.com\//.test(active.url || '')
-              ? <a className="btn-primary" href={active.url} target="_blank" rel="noreferrer">Abrir en Google Docs <ArrowUpRight size={17} /></a>
-              : <p className="error">El enlace guardado no es válido.</p>
-            }
-          </footer>
-        </div>
-      </Dialog>
+    {formProps && (
+      <DocumentForm
+        country={formProps.country}
+        initial={formProps.initial}
+        onClose={closeForm}
+        onSave={save}
+      />
     )}
     </>
   )
