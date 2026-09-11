@@ -1,15 +1,16 @@
 // ============================================================
-// Integración con Google Sheets — Portal Voccare Nodo Sur
+// Apps Script — Portal Voccare Nodo Sur (v2)
 // ============================================================
 //
-// Los documentos del tablero se leen desde un Google Sheet.
-// El portal también puede escribir nuevas filas vía doPost.
+// Soporta: leer, crear, editar y eliminar documentos.
+// Cada fila tiene un id único generado por el script.
 //
 // ------------------------------------------------------------
 // PASO 1 — Estructura del Google Sheet
 // ------------------------------------------------------------
-// Primera fila debe tener exactamente estos encabezados:
-//   country | account | title | url | status
+// Primera fila con exactamente estos encabezados (en orden):
+//
+//   id | country | account | title | url | status
 //
 // Valores válidos para "country":
 //   argentina, bolivia, chile, ecuador, paraguay, peru, uruguay
@@ -18,72 +19,108 @@
 //   signature, review, new, done
 //
 // ------------------------------------------------------------
-// PASO 2 — Pegar este código en el editor de Apps Script
+// PASO 2 — Pegar este código en Apps Script
 //   (Extensiones → Apps Script desde el Sheet)
 // ------------------------------------------------------------
 
+const SHEET_NAME = 'Hoja 1'
+
 function doGet() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Hoja 1')
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME)
   const rows = sheet.getDataRange().getValues()
+  if (rows.length < 2) return respond([])
   const headers = rows[0]
   const data = rows.slice(1)
-    .filter(row => row[0])
+    .filter(row => row[0] !== '')
     .map(row => {
       const obj = {}
       headers.forEach((h, i) => { obj[h] = row[i] })
       return obj
     })
+  return respond(data)
+}
+
+function doPost(e) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME)
+  const data  = JSON.parse(e.postData.contents)
+  const rows  = sheet.getDataRange().getValues()
+  const headers = rows[0]
+  const idCol   = headers.indexOf('id') + 1  // 1-based
+
+  // ── Eliminar ──────────────────────────────────────────────
+  if (data.action === 'delete') {
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][idCol - 1] === data.id) {
+        sheet.deleteRow(i + 1)
+        return respond({ ok: true })
+      }
+    }
+    return respond({ ok: false, error: 'not found' })
+  }
+
+  // ── Editar ────────────────────────────────────────────────
+  if (data.action === 'update') {
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][idCol - 1] === data.id) {
+        const rowNum = i + 1
+        headers.forEach((h, col) => {
+          if (h !== 'id' && data[h] !== undefined) {
+            sheet.getRange(rowNum, col + 1).setValue(data[h])
+          }
+        })
+        return respond({ ok: true })
+      }
+    }
+    return respond({ ok: false, error: 'not found' })
+  }
+
+  // ── Crear ─────────────────────────────────────────────────
+  const id = Utilities.getUuid()
+  sheet.appendRow([
+    id,
+    data.country  || '',
+    data.account  || '',
+    data.title    || '',
+    data.url      || '',
+    data.status   || 'signature'
+  ])
+  return respond({ ok: true, id })
+}
+
+function respond(data) {
   return ContentService
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON)
 }
 
-function doPost(e) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Hoja 1')
-  const data = JSON.parse(e.postData.contents)
-  sheet.appendRow([
-    data.country,
-    data.account,
-    data.title,
-    data.url,
-    data.status || 'signature'
-  ])
-  return ContentService
-    .createTextOutput(JSON.stringify({ ok: true }))
-    .setMimeType(ContentService.MimeType.JSON)
-}
-
 // ------------------------------------------------------------
-// PASO 3 — Re-desplegar como Web App (nueva implementación)
+// PASO 3 — Desplegar como Web App
 // ------------------------------------------------------------
-// Cada vez que se modifica el código hay que crear una nueva
-// implementación para que los cambios tomen efecto.
+// Cada vez que modificás el código creá una NUEVA implementación:
 //
 // 1. Desplegar → Nueva implementación
 // 2. Tipo: Aplicación web
 // 3. Ejecutar como: Yo (tu cuenta de Google)
 // 4. Quién tiene acceso: Cualquier usuario
-// 5. Copiar la nueva URL (termina en /exec) y actualizar .env.local
+// 5. Copiá la nueva URL (/exec) y actualizá .env.local
+//
+// IMPORTANTE: "Nueva implementación" cada vez, no "Administrar".
+// Sin nueva implementación los cambios de código NO tienen efecto.
 //
 // ------------------------------------------------------------
-// PASO 4 — Configurar el portal
+// PASO 4 — Actualizar .env.local
 // ------------------------------------------------------------
-// Crear un archivo .env.local en la raíz del proyecto:
 //
-//   VITE_SHEETS_URL=https://script.google.com/macros/s/TU_ID/exec
+//   VITE_SHEETS_URL=https://script.google.com/macros/s/TU_NUEVO_ID/exec
 //
-// Reiniciar el servidor: npm run dev
-// En producción: configurar VITE_SHEETS_URL en Vercel/Netlify.
-//
-// ------------------------------------------------------------
-// NOTA — Si la hoja se llama distinto a "Hoja 1"
-// ------------------------------------------------------------
-// Cambiar el nombre en getSheetByName('Hoja 1') en ambas funciones.
+// Y actualizar el secret VITE_SHEETS_URL en GitHub →
+// Settings → Secrets and variables → Actions
 //
 // ------------------------------------------------------------
 // SEGURIDAD
 // ------------------------------------------------------------
-// doGet: solo lectura.
-// doPost: escritura pública — cualquiera con la URL puede agregar
-// filas. Para uso interno donde la URL no es pública, esto es
-// aceptable. No exponer la URL en código público o repositorios.
+// La URL es la única protección. No publicarla en código abierto.
+// Para mayor seguridad se puede agregar un token secreto:
+//
+//   if (data.token !== 'MI_TOKEN_SECRETO') return respond({ ok: false })
+//

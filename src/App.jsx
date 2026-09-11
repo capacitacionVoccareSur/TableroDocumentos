@@ -197,7 +197,7 @@ export default function App() {
         if (!Array.isArray(data)) return
         const docs = data
           .filter(d => d && typeof d.country === 'string' && typeof d.title === 'string' && typeof d.account === 'string')
-          .map((d, i) => ({ ...d, id: 'remote-' + i, url: typeof d.url === 'string' ? d.url : '' }))
+          .map(d => ({ ...d, id: String(d.id || 'remote-' + Date.now() + Math.random()), url: typeof d.url === 'string' ? d.url : '' }))
         setRemote(docs)
       })
       .catch(() => {})
@@ -218,22 +218,20 @@ export default function App() {
   function openNew(countryId) { setFormState(countryId) }
   function openEdit(doc)      { setFormState(doc) }
 
-  function save(form) {
+  async function save(form) {
     const doc = { ...form, title: form.title.trim(), account: form.account.trim() }
     const isEdit = formState && typeof formState === 'object'
     const editId = isEdit ? formState.id : null
 
     if (SHEETS_URL) {
-      fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify(editId ? { ...doc, action: 'update', id: editId } : doc) }).catch(() => {})
       if (editId) {
+        fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify({ ...doc, action: 'update', id: editId }) }).catch(() => {})
         setRemote(prev => prev.map(d => d.id === editId ? { ...d, ...doc } : d))
-        setLocal(prev => {
-          const next = prev.map(d => d.id === editId ? { ...d, ...doc } : d)
-          localStorage.setItem(storageKey, JSON.stringify(next))
-          return next
-        })
       } else {
-        setRemote(prev => [...prev, { ...doc, id: 'remote-' + Date.now() }])
+        const res = await fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify(doc) }).catch(() => null)
+        const result = res ? await res.json().catch(() => null) : null
+        const id = result?.id || 'remote-' + Date.now()
+        setRemote(prev => [...prev, { ...doc, id }])
       }
     } else {
       if (editId) {
