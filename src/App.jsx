@@ -223,14 +223,19 @@ export default function App() {
     const isEdit = formState && typeof formState === 'object'
     const editId = isEdit ? formState.id : null
 
+    const postOpts = body => ({
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(body),
+    })
+
     if (SHEETS_URL) {
       if (editId) {
-        fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify({ ...doc, action: 'update', id: editId }) }).catch(() => {})
+        fetch(SHEETS_URL, postOpts({ ...doc, action: 'update', id: editId })).catch(() => {})
         setRemote(prev => prev.map(d => d.id === editId ? { ...d, ...doc } : d))
       } else {
-        const res = await fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify(doc) }).catch(() => null)
-        const result = res ? await res.json().catch(() => null) : null
-        const id = result?.id || 'remote-' + Date.now()
+        const id = crypto.randomUUID()
+        fetch(SHEETS_URL, postOpts({ ...doc, id })).catch(() => {})
         setRemote(prev => [...prev, { ...doc, id }])
       }
     } else {
@@ -249,7 +254,11 @@ export default function App() {
 
   function remove(doc) {
     if (SHEETS_URL) {
-      fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify({ action: 'delete', id: doc.id }) }).catch(() => {})
+      fetch(SHEETS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'delete', id: doc.id }),
+      }).catch(() => {})
       setRemote(prev => prev.filter(d => d.id !== doc.id))
     }
     // always clean from local too (covers local: true docs)

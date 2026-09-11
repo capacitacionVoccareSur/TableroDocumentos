@@ -75,7 +75,7 @@ function doPost(e) {
   }
 
   // ── Crear ─────────────────────────────────────────────────
-  const id = Utilities.getUuid()
+  const id = data.id || Utilities.getUuid()
   sheet.appendRow([
     id,
     data.country  || '',
