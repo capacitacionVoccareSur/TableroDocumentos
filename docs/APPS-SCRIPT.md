@@ -34,7 +34,7 @@ function doGet() {
     .filter(row => row[0] !== '')
     .map(row => {
       const obj = {}
-      headers.forEach((h, i) => { obj[h] = row[i] })
+      headers.forEach((h, i) => { obj[h.trim()] = row[i] })
       return obj
     })
   return respond(data)
@@ -44,7 +44,7 @@ function doPost(e) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME)
   const data  = JSON.parse(e.postData.contents)
   const rows  = sheet.getDataRange().getValues()
-  const headers = rows[0]
+  const headers = rows[0].map(h => h.trim())
   const idCol   = headers.indexOf('id') + 1  // 1-based
 
   // ── Eliminar ──────────────────────────────────────────────
